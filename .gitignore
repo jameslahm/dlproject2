@@ -1,6 +1,6 @@
 src_data/
 tgt_data/
 __pycache__/
-anime/
+anime_results/
 pre_trained_VGG19_model_path/
 result.txt

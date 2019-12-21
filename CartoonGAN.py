@@ -100,10 +100,11 @@ BCE_loss = nn.BCELoss().to(device)
 L1_loss = nn.L1Loss().to(device)
 
 # Adam optimizer
-G_scheduler = optim.lr_scheduler.MultiStepLR(optimizer=G_optimizer, milestones=[args.train_epoch // 2, args.train_epoch // 4 * 3], gamma=0.1)
-D_scheduler = optim.lr_scheduler.MultiStepLR(optimizer=D_optimizer, milestones=[args.train_epoch // 2, args.train_epoch // 4 * 3], gamma=0.1)
 G_optimizer = optim.Adam(G.parameters(), lr=args.lrG, betas=(args.beta1, args.beta2))
-D_optimizer = optim.Adam(D.parameters(), lr=args.lrD, betas=(args.beta1, args.beta2))
+# D_optimizer = optim.Adam(D.parameters(), lr=args.lrD, betas=(args.beta1, args.beta2))
+D_optimizer = optim.Adam(D.parameters(), lr=0, betas=(args.beta1, args.beta2))
+G_scheduler = optim.lr_scheduler.MultiStepLR(optimizer=G_optimizer, milestones=[args.train_epoch // 2, args.train_epoch // 4 * 3], gamma=0.1)
+# D_scheduler = optim.lr_scheduler.MultiStepLR(optimizer=D_optimizer, milestones=[args.train_epoch // 2, args.train_epoch // 4 * 3], gamma=0.1)
 
 
 pre_train_hist = {}
@@ -180,8 +181,6 @@ fake = torch.zeros(args.batch_size, 1, args.input_size // 4, args.input_size // 
 for epoch in range(args.train_epoch):
     epoch_start_time = time.time()
     G.train()
-    G_scheduler.step()
-    D_scheduler.step()
     Disc_losses = []
     Gen_losses = []
     Con_losses = []
@@ -230,6 +229,9 @@ for epoch in range(args.train_epoch):
         Gen_loss.backward()
         G_optimizer.step()
 
+
+    G_scheduler.step()
+    # D_scheduler.step()
 
     per_epoch_time = time.time() - epoch_start_time
     train_hist['per_epoch_time'].append(per_epoch_time)

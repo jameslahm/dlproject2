@@ -1,6 +1,7 @@
 import os, time, pickle, argparse, networks, utils
 import torch
 import torch.nn as nn
+from torch.nn import functional as F
 import torch.optim as optim
 import matplotlib.pyplot as plt
 from torchvision import transforms
@@ -24,7 +25,7 @@ parser.add_argument('--train_epoch', type=int, default=100)
 parser.add_argument('--pre_train_epoch', type=int, default=10)
 parser.add_argument('--lrD', type=float, default=0.0002, help='learning rate, default=0.0002')
 parser.add_argument('--lrG', type=float, default=0.0002, help='learning rate, default=0.0002')
-parser.add_argument('--con_lambda', type=float, default=10, help='lambda for content loss')
+parser.add_argument('--con_lambda', type=float, default=5, help='lambda for content loss')
 parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for Adam optimizer')
 parser.add_argument('--beta2', type=float, default=0.999, help='beta2 for Adam optimizer')
 parser.add_argument('--latest_generator_model', required=False, default='', help='the latest trained model path')
@@ -82,7 +83,11 @@ if args.latest_discriminator_model != '':
         D.load_state_dict(torch.load(args.latest_discriminator_model))
     else:
         D.load_state_dict(torch.load(args.latest_discriminator_model, map_location=lambda storage, loc: storage))
+
+
 VGG = networks.VGG19(init_weights=args.vgg_model, feature_mode=True)
+
+
 G.to(device)
 D.to(device)
 VGG.to(device)
@@ -99,11 +104,32 @@ print('-----------------------------------------------')
 BCE_loss = nn.BCELoss().to(device)
 L1_loss = nn.L1Loss().to(device)
 
+# 纹理损失
+def gram_matrix(input):
+    a, b, c, d = input.size()  # a=batch size(=1)
+    # b=number of feature maps
+    # (c,d)=dimensions of a f. map (N=c*d)
+
+    features = input.view(a * b, c * d)  # resise F_XL into \hat F_XL
+
+    G = torch.mm(features, features.t())  # compute the gram product
+
+    # we 'normalize' the values of the gram matrix
+    # by dividing by the number of element in each feature maps.
+    return G.div(a * b * c * d)
+
+def styleloss(target,input):
+    target = gram_matrix().detach()
+    G = gram_matrix(input)
+    loss = L1_loss(G, target)
+    return loss
+
+
 # Adam optimizer
-G_scheduler = optim.lr_scheduler.MultiStepLR(optimizer=G_optimizer, milestones=[args.train_epoch // 2, args.train_epoch // 4 * 3], gamma=0.1)
-D_scheduler = optim.lr_scheduler.MultiStepLR(optimizer=D_optimizer, milestones=[args.train_epoch // 2, args.train_epoch // 4 * 3], gamma=0.1)
 G_optimizer = optim.Adam(G.parameters(), lr=args.lrG, betas=(args.beta1, args.beta2))
 D_optimizer = optim.Adam(D.parameters(), lr=args.lrD, betas=(args.beta1, args.beta2))
+G_scheduler = optim.lr_scheduler.MultiStepLR(optimizer=G_optimizer, milestones=[args.train_epoch // 2, args.train_epoch // 4 * 3], gamma=0.1)
+D_scheduler = optim.lr_scheduler.MultiStepLR(optimizer=D_optimizer, milestones=[args.train_epoch // 2, args.train_epoch // 4 * 3], gamma=0.1)
 
 
 pre_train_hist = {}
@@ -171,6 +197,7 @@ train_hist = {}
 train_hist['Disc_loss'] = []
 train_hist['Gen_loss'] = []
 train_hist['Con_loss'] = []
+train_hist['Style_loss']=[]
 train_hist['per_epoch_time'] = []
 train_hist['total_time'] = []
 print('training start!')
@@ -185,6 +212,7 @@ for epoch in range(args.train_epoch):
     Disc_losses = []
     Gen_losses = []
     Con_losses = []
+    Style_losses=[]
     for (x, _), (y, _) in zip(train_loader_src, train_loader_tgt):
         e = y[:, :, :, args.input_size:]
         y = y[:, :, :, :args.input_size]
@@ -200,6 +228,7 @@ for epoch in range(args.train_epoch):
         D_fake = D(G_)
         D_fake_loss = BCE_loss(D_fake, fake)
 
+        # 抗边缘损失
         D_edge = D(e)
         D_edge_loss = BCE_loss(D_edge, fake)
 
@@ -221,11 +250,17 @@ for epoch in range(args.train_epoch):
         G_feature = VGG((G_ + 1) / 2)
         Con_loss = args.con_lambda * L1_loss(G_feature, x_feature.detach())
 
-        Gen_loss = D_fake_loss + Con_loss
+        Style_loss=styleloss(VGG((y+1)/2),G_feature)
+
+
+        Gen_loss = D_fake_loss + Con_loss+Style_loss
         Gen_losses.append(D_fake_loss.item())
         train_hist['Gen_loss'].append(D_fake_loss.item())
         Con_losses.append(Con_loss.item())
         train_hist['Con_loss'].append(Con_loss.item())
+        Style_losses.append(Style_loss.item())
+        train_hist['Style_loss'].append(Style_loss.item())
+
 
         Gen_loss.backward()
         G_optimizer.step()
@@ -234,8 +269,8 @@ for epoch in range(args.train_epoch):
     per_epoch_time = time.time() - epoch_start_time
     train_hist['per_epoch_time'].append(per_epoch_time)
     print(
-    '[%d/%d] - time: %.2f, Disc loss: %.3f, Gen loss: %.3f, Con loss: %.3f' % ((epoch + 1), args.train_epoch, per_epoch_time, torch.mean(torch.FloatTensor(Disc_losses)),
-        torch.mean(torch.FloatTensor(Gen_losses)), torch.mean(torch.FloatTensor(Con_losses))))
+    '[%d/%d] - time: %.2f, Disc loss: %.3f, Gen loss: %.3f, Style loss: %.3f, Con loss: %.3f' % ((epoch + 1), args.train_epoch, per_epoch_time, torch.mean(torch.FloatTensor(Disc_losses)),
+        torch.mean(torch.FloatTensor(Gen_losses)),torch.mean(torch.FloatTensor(Style_losses)),torch.mean(torch.FloatTensor(Con_losses))))
 
     if epoch % 2 == 1 or epoch == args.train_epoch - 1:
         with torch.no_grad():

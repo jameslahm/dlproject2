@@ -1,18 +1,8 @@
-import os, time, pickle, argparse, networks, utils
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import matplotlib.pyplot as plt
-from torchvision import transforms
-from edge_promoting import edge_promoting
+import face_alignment
+from skimage import io
 
-tgt_transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
-])
-train_loader_tgt = utils.data_load(os.path.join('data', 'tgt_data'), 'pair', tgt_transform, 4, shuffle=True, drop_last=True)
+# cuda for CUDA
+fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, device='cpu')
 
-for (y, _) in train_loader_tgt:
-    print(y.size())
-    e = y[:, :, :, 256:]
-    y = y[:, :, :, :256]
+input = io.imread('data/00001.jpg')
+preds = fa.get_landmarks(input)

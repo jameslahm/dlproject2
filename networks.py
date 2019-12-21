@@ -14,11 +14,21 @@ class resnet_block(nn.Module):
         self.conv2 = nn.Conv2d(channel, channel, kernel, stride, padding)
         self.conv2_norm = nn.InstanceNorm2d(channel)
 
+        self.fc1=nn.Conv2d(channel,channel//16,kernel_size=1)
+        self.fc2=nn.Conv2d(channel//16,channel,kernel_size=1)
+
         utils.initialize_weights(self)
 
     def forward(self, input):
         x = F.relu(self.conv1_norm(self.conv1(input)), True)
         x = self.conv2_norm(self.conv2(x))
+
+
+        # SE模块
+        w=F.avg_pool2d(x,x.size(2))
+        w=F.relu(self.fc1(w))
+        w=F.sigmoid(self.fc2(w))
+        x=x*w
 
         return input + x #Elementwise Sum
  
@@ -84,20 +94,26 @@ class discriminator(nn.Module):
         self.nf = nf
         self.convs = nn.Sequential(
             nn.Conv2d(in_nc, nf, 3, 1, 1),
-            nn.LeakyReLU(0.2, True),
+            # nn.LeakyReLU(0.2, True),
+            nn.ReLU(True),
             nn.Conv2d(nf, nf * 2, 3, 2, 1),
-            nn.LeakyReLU(0.2, True),
+            # nn.LeakyReLU(0.2, True),
+            nn.ReLU(True),
             nn.Conv2d(nf * 2, nf * 4, 3, 1, 1),
             nn.InstanceNorm2d(nf * 4),
-            nn.LeakyReLU(0.2, True),
+            # nn.LeakyReLU(0.2, True),
+            nn.ReLU(True),
             nn.Conv2d(nf * 4, nf * 4, 3, 2, 1),
-            nn.LeakyReLU(0.2, True),
+            # nn.LeakyReLU(0.2, True),
+            nn.ReLU(True),
             nn.Conv2d(nf * 4, nf * 8, 3, 1, 1),
             nn.InstanceNorm2d(nf * 8),
-            nn.LeakyReLU(0.2, True),
+            # nn.LeakyReLU(0.2, True),
+            nn.ReLU(True),
             nn.Conv2d(nf * 8, nf * 8, 3, 1, 1),
             nn.InstanceNorm2d(nf * 8),
-            nn.LeakyReLU(0.2, True),
+            # nn.LeakyReLU(0.2, True),
+            nn.ReLU(True),
             nn.Conv2d(nf * 8, out_nc, 3, 1, 1),
             nn.Sigmoid(),
         )

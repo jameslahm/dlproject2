@@ -8,8 +8,8 @@ from edge_promoting import edge_promoting
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--name', required=False, default='project_name',  help='')
-parser.add_argument('--src_data', required=False, default='src_data_path',  help='sec data path')
-parser.add_argument('--tgt_data', required=False, default='tgt_data_path',  help='tgt data path')
+parser.add_argument('--src_data', required=False, default='src_data',  help='sec data path')
+parser.add_argument('--tgt_data', required=False, default='tgt_data',  help='tgt data path')
 parser.add_argument('--vgg_model', required=False, default='pre_trained_VGG19_model_path/vgg19.pth', help='pre-trained VGG19 model path')
 parser.add_argument('--in_ngc', type=int, default=3, help='input channel for generator')
 parser.add_argument('--out_ngc', type=int, default=3, help='output channel for generator')
@@ -100,10 +100,11 @@ BCE_loss = nn.BCELoss().to(device)
 L1_loss = nn.L1Loss().to(device)
 
 # Adam optimizer
-G_optimizer = optim.Adam(G.parameters(), lr=args.lrG, betas=(args.beta1, args.beta2))
-D_optimizer = optim.Adam(D.parameters(), lr=args.lrD, betas=(args.beta1, args.beta2))
 G_scheduler = optim.lr_scheduler.MultiStepLR(optimizer=G_optimizer, milestones=[args.train_epoch // 2, args.train_epoch // 4 * 3], gamma=0.1)
 D_scheduler = optim.lr_scheduler.MultiStepLR(optimizer=D_optimizer, milestones=[args.train_epoch // 2, args.train_epoch // 4 * 3], gamma=0.1)
+G_optimizer = optim.Adam(G.parameters(), lr=args.lrG, betas=(args.beta1, args.beta2))
+D_optimizer = optim.Adam(D.parameters(), lr=args.lrD, betas=(args.beta1, args.beta2))
+
 
 pre_train_hist = {}
 pre_train_hist['Recon_loss'] = []

@@ -8,7 +8,7 @@ from torchvision import transforms
 from edge_promoting import edge_promoting
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--name', required=False, default='project_name',  help='')
+parser.add_argument('--name', required=False, default='anime',  help='')
 parser.add_argument('--src_data', required=False, default='src_data',  help='sec data path')
 parser.add_argument('--tgt_data', required=False, default='tgt_data',  help='tgt data path')
 parser.add_argument('--vgg_model', required=False, default='pre_trained_VGG19_model_path/vgg19.pth', help='pre-trained VGG19 model path')
@@ -28,8 +28,8 @@ parser.add_argument('--lrG', type=float, default=0.0002, help='learning rate, de
 parser.add_argument('--con_lambda', type=float, default=5, help='lambda for content loss')
 parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for Adam optimizer')
 parser.add_argument('--beta2', type=float, default=0.999, help='beta2 for Adam optimizer')
-parser.add_argument('--latest_generator_model', required=False, default='', help='the latest trained model path')
-parser.add_argument('--latest_discriminator_model', required=False, default='', help='the latest trained model path')
+parser.add_argument('--latest_generator_model', required=False, default='anime_results/generator_latest.pkl', help='the latest trained model path')
+parser.add_argument('--latest_discriminator_model', required=False, default='anime_results/discriminator_latest.pkl', help='the latest trained model path')
 args = parser.parse_args()
 
 print('------------ Options -------------')
@@ -119,7 +119,7 @@ def gram_matrix(input):
     return G.div(a * b * c * d)
 
 def styleloss(target,input):
-    target = gram_matrix().detach()
+    target = gram_matrix(target).detach()
     G = gram_matrix(input)
     loss = L1_loss(G, target)
     return loss
@@ -127,10 +127,9 @@ def styleloss(target,input):
 
 # Adam optimizer
 G_optimizer = optim.Adam(G.parameters(), lr=args.lrG, betas=(args.beta1, args.beta2))
-# D_optimizer = optim.Adam(D.parameters(), lr=args.lrD, betas=(args.beta1, args.beta2))
-D_optimizer = optim.Adam(D.parameters(), lr=0, betas=(args.beta1, args.beta2))
+D_optimizer = optim.Adam(D.parameters(), lr=args.lrD, betas=(args.beta1, args.beta2))
 G_scheduler = optim.lr_scheduler.MultiStepLR(optimizer=G_optimizer, milestones=[args.train_epoch // 2, args.train_epoch // 4 * 3], gamma=0.1)
-# D_scheduler = optim.lr_scheduler.MultiStepLR(optimizer=D_optimizer, milestones=[args.train_epoch // 2, args.train_epoch // 4 * 3], gamma=0.1)
+D_scheduler = optim.lr_scheduler.MultiStepLR(optimizer=D_optimizer, milestones=[args.train_epoch // 2, args.train_epoch // 4 * 3], gamma=0.1)
 
 
 pre_train_hist = {}
@@ -249,7 +248,7 @@ for epoch in range(args.train_epoch):
         G_feature = VGG((G_ + 1) / 2)
         Con_loss = args.con_lambda * L1_loss(G_feature, x_feature.detach())
 
-        Style_loss=styleloss(VGG((y+1)/2),G_feature)
+        Style_loss=10*styleloss(VGG((y+1)/2),G_feature)
 
 
         Gen_loss = D_fake_loss + Con_loss+Style_loss
@@ -266,7 +265,7 @@ for epoch in range(args.train_epoch):
 
 
     G_scheduler.step()
-    # D_scheduler.step()
+    D_scheduler.step()
 
     per_epoch_time = time.time() - epoch_start_time
     train_hist['per_epoch_time'].append(per_epoch_time)

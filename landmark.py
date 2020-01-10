@@ -4,5 +4,8 @@ from skimage import io
 # cuda for CUDA
 fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, device='cuda')
 
-input = io.imread('data/src_data/train/00001.jpg')
-preds = fa.get_landmarks(input)
+## 人脸关键点标记
+def getLandMark(file):
+    input = io.imread(file)
+    preds = fa.get_landmarks(input)
+

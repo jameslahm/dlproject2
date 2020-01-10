@@ -4,3 +4,4 @@ __pycache__/
 anime_results/
 pre_trained_VGG19_model_path/
 result.txt
+*.pth

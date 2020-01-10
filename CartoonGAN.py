@@ -57,6 +57,7 @@ else:
 # data_loader
 src_transform = transforms.Compose([
         transforms.Resize((args.input_size, args.input_size)),
+        transforms.ColorJitter(brightness=0.5,contrast=0.5,saturation=1),
         transforms.ToTensor(),
         transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
 ])
@@ -64,8 +65,8 @@ tgt_transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
 ])
-train_loader_src = utils.data_load(os.path.join('data', args.src_data), 'train', src_transform, args.batch_size, shuffle=True, drop_last=True)
 train_loader_tgt = utils.data_load(os.path.join('data', args.tgt_data), 'pair', tgt_transform, args.batch_size, shuffle=True, drop_last=True)
+train_loader_src = utils.data_load(os.path.join('data', args.src_data), 'train', src_transform, args.batch_size, shuffle=True, drop_last=True)
 test_loader_src = utils.data_load(os.path.join('data', args.src_data), 'test', src_transform, 1, shuffle=True, drop_last=True)
 
 # network
@@ -98,6 +99,9 @@ print('---------- Networks initialized -------------')
 utils.print_network(G)
 utils.print_network(D)
 utils.print_network(VGG)
+torch.save(G,"G.pth")
+torch.save(D,"D.pth")
+torch.save(VGG,"VGG.pth")
 print('-----------------------------------------------')
 
 # loss
@@ -114,7 +118,7 @@ def gram_matrix(input):
 
     G = torch.mm(features, features.t())  # compute the gram product
 
-    # we 'normalize' the values of the gram matrix
+    # 'normalize' the values of the gram matrix
     # by dividing by the number of element in each feature maps.
     return G.div(a * b * c * d)
 
@@ -256,6 +260,7 @@ for epoch in range(args.train_epoch):
         train_hist['Gen_loss'].append(D_fake_loss.item())
         Con_losses.append(Con_loss.item())
         train_hist['Con_loss'].append(Con_loss.item())
+        
         Style_losses.append(Style_loss.item())
         train_hist['Style_loss'].append(Style_loss.item())
 
@@ -290,6 +295,7 @@ for epoch in range(args.train_epoch):
                 G_recon = G(x)
                 result = torch.cat((x[0], G_recon[0]), 2)
                 path = os.path.join(args.name + '_results', 'Transfer', str(epoch+1) + '_epoch_' + args.name + '_test_' + str(n + 1) + '.png')
+                # path = os.path.join(args.name + '_results', 'Transfer',str(66000+n)+'.png')
                 plt.imsave(path, (result.cpu().numpy().transpose(1, 2, 0) + 1) / 2)
                 if n == 4:
                     break
